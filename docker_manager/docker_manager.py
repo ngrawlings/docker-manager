@@ -55,40 +55,44 @@ class DockerManager:
         cmd = f"docker rm {container_name}"
         subprocess.Popen(cmd, shell=True)
 
+    def _run_command(cmd):
+        print(f"Running command: {' '.join(cmd)}")
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = process.communicate()
+        print(f"Command output: {stdout.decode('utf-8')}")
+        if stderr:
+            print(f"Command error: {stderr.decode('utf-8')}")
+
     def create_download_candles_container(self, candles_config: Dict, yml_path: str):
         os_utils.dump_dict_to_yaml(candles_config, yml_path)
         command = ["docker", "compose", "-p", "data_downloader", "-f",
-                   "hummingbot_files/compose_files/data-downloader-compose.yml", "up", "-d"]
-        subprocess.Popen(command)
+                "hummingbot_files/compose_files/data-downloader-compose.yml", "up", "-d"]
+        _run_command(command)
 
     def create_broker(self):
         command = ["docker", "compose", "-p", "hummingbot-broker", "-f",
-                   "hummingbot_files/compose_files/broker-compose.yml", "up", "-d", "--remove-orphans"]
-        subprocess.Popen(command)
+                "hummingbot_files/compose_files/broker-compose.yml", "up", "-d", "--remove-orphans"]
+        _run_command(command)
 
     def create_hummingbot_instance(self, instance_name: str,
-                                   base_conf_folder: str,
-                                   target_conf_folder: str,
-                                   controllers_folder: Optional[str] = None,
-                                   controllers_config_folder: Optional[str] = None,
-                                   extra_environment_variables: Optional[list] = None,
-                                   image: str = "hummingbot/hummingbot:latest"):
+                                base_conf_folder: str,
+                                target_conf_folder: str,
+                                controllers_folder: Optional[str] = None,
+                                controllers_config_folder: Optional[str] = None,
+                                extra_environment_variables: Optional[list] = None,
+                                image: str = "hummingbot/hummingbot:latest"):
         if not os_utils.directory_exists(target_conf_folder):
             create_folder_command = ["mkdir", "-p", target_conf_folder]
-            create_folder_task = subprocess.Popen(create_folder_command)
-            create_folder_task.wait()
+            run_command(create_folder_command)
             command = ["cp", "-rf", base_conf_folder, target_conf_folder]
-            copy_folder_task = subprocess.Popen(command)
-            copy_folder_task.wait()
+            run_command(command)
         if controllers_folder and controllers_config_folder:
             # Copy controllers folder
             command = ["cp", "-rf", controllers_folder, target_conf_folder]
-            t1 = subprocess.Popen(command)
-            t1.wait()
+            run_command(command)
             # Copy controllers config folder
             command = ["cp", "-rf", controllers_config_folder, target_conf_folder]
-            t2 = subprocess.Popen(command)
-            t2.wait()
+            run_command(command)
         conf_file_path = f"{target_conf_folder}/conf/conf_client.yml"
         config = os_utils.read_yaml_file(conf_file_path)
         config['instance_id'] = instance_name
@@ -115,4 +119,4 @@ class DockerManager:
         if extra_environment_variables:
             create_container_command.extend(extra_environment_variables)
         create_container_command.append(image)
-        subprocess.Popen(create_container_command)
+        _run_command(create_container_command)
